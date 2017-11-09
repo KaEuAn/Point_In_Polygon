@@ -165,6 +165,8 @@ bool isHigher(Point a, Segment b) {
     return isLessThan((a.x - b.start.x) / (b.finish.x - b.start.x) * (b.finish.y - b.start.y) + b.start.y, a.y);
 }
 bool contains(Point a, Segment b) {
+    if (b.start.x == b.finish.x)
+        return (a.x == b.start.x) && (a.y < b.finish.y && b.start.y < a.y);
     return areEqual((a.x - b.start.x) / (b.finish.x - b.start.x) * (b.finish.y - b.start.y) + b.start.y, a.y);
 }
 
