@@ -14,7 +14,6 @@ using std::string;
 using u32 = uint32_t;
 using u64 = uint64_t;
 using ld = long double;
-using ll = long long;
 const ld EPS = 1e-10;
 
 enum Type{
@@ -36,25 +35,25 @@ bool isLessThan(ld x, ld y) {
 
 
 struct Point {
-    ll x;
-    ll y;
+    ld x;
+    ld y;
 public:
     Point() : x(0), y(0) {}
-    Point(ll first, ll second) : x(first), y(second){}
+    Point(ld first, ld second) : x(first), y(second){}
 
-    ll length() const {
+    ld length() const {
         return std::sqrt(x * x + y * y);
     }
-    ll operator%(const Point& second) const {
+    ld operator%(const Point& second) const {
         return x * second.y - y * second.x;
     }
-    ll operator*(const Point& second) const {
+    ld operator*(const Point& second) const {
         return x * second.x + y * second.y;
     }
-    ll len2() const {
+    ld len2() const {
         return x*x + y*y;
     }
-    ll len() const {
+    ld len() const {
         return std::sqrt(len2());
     }
 
@@ -174,12 +173,15 @@ struct Event{
 };
 
 bool isHigher(Point a, Segment b) {
+    if (b.start.x == b.finish.x)
+        return a.y > b.finish.y;
     return isLessThan((a.x - b.start.x) / (b.finish.x - b.start.x) * (b.finish.y - b.start.y) + b.start.y, a.y);
 }
 bool contains(Point a, Segment b) {
     if (b.start.x == b.finish.x)
         return (a.x == b.start.x) && (a.y < b.finish.y && b.start.y < a.y);
-    return areEqual((a.x - b.start.x) / (b.finish.x - b.start.x) * (b.finish.y - b.start.y) + b.start.y, a.y);
+    ld x = ((ld)(a.x - b.start.x) * (b.finish.y - b.start.y) ) / (b.finish.x - b.start.x);
+    return areEqual(x + b.start.y, a.y);
 }
 
 class Node {
@@ -213,17 +215,17 @@ public:
             return std::make_pair(this, 0);
         }
 
-        if (isHigher(findKey, key)) {
-            auto x = right->find(findKey);
-            x.second += left->countBehindFunc() + 1;
-            if(! x.first) {
+        if (! isHigher(findKey, key)) {
+            auto x = left->find(findKey);
+            if(! x.first)
                 x.first = this;
-            }
             return x;
         }
-        auto x = left->find(findKey);
-        if(! x.first)
+        auto x = right->find(findKey);
+        x.second += left->countBehindFunc() + 1;
+        if(! x.first) {
             x.first = this;
+        }
         return x;
     }
 
