@@ -14,6 +14,7 @@ using std::string;
 using u32 = uint32_t;
 using u64 = uint64_t;
 using ld = long double;
+using ll = long long;
 const ld EPS = 1e-10;
 
 enum Type{
@@ -35,35 +36,35 @@ bool isLessThan(ld x, ld y) {
 
 
 struct Point {
-    ld x;
-    ld y;
+    ll x;
+    ll y;
 public:
     Point() : x(0), y(0) {}
-    Point(ld first, ld second) : x(first), y(second){}
+    Point(ll first, ll second) : x(first), y(second){}
 
-    ld length() const {
+    ll length() const {
         return std::sqrt(x * x + y * y);
     }
-    ld operator%(const Point& second) const {
+    ll operator%(const Point& second) const {
         return x * second.y - y * second.x;
     }
-    ld operator*(const Point& second) const {
+    ll operator*(const Point& second) const {
         return x * second.x + y * second.y;
     }
-    ld len2() const {
+    ll len2() const {
         return x*x + y*y;
     }
-    ld len() const {
+    ll len() const {
         return std::sqrt(len2());
     }
 
 
     bool operator ==(const Point& a) const {
-        return (areEqual(x, a.x) && areEqual(y, a.y));
+        return (x == a.x && y == a.y);
     }
     bool operator <(const Point& a) const {
-        if (areEqual(x, a.x)) {
-            return isLessThan(y, a.y);
+        if (x == a.x) {
+            return y < a.y;
         }
         return x < a.x;
     }
@@ -72,23 +73,23 @@ public:
     }
 
     bool ycomp(const Point& a) const {
-        if (areEqual(y, a.y)) {
-            return isLessThan(x, a.x);
+        if (y == a.y) {
+            return x < a.x;
         }
         return y < a.y;
     }
     bool yequal(const Point& a) const {
-        return areEqual(y, a.y);
+        return y == a.y;
     }
 
     bool xcomp(const Point& a) const {
-        if (areEqual(x, a.x)) {
-            return isLessThan(y, a.y);
+        if (x == a.x) {
+            return y < a.y;
         }
         return x < a.x;
     }
     bool xequal(const Point& a) const {
-        return areEqual(x, a.x);
+        return x == a.x;
     }
 
 
@@ -123,8 +124,8 @@ public:
         c.y *= a;
         return c;
     }
-    //friend bool areSegmentrsIntersects(const Point& a, const Point& b, const Point& c, const Point& d);
 };
+
 struct Segment {
     Point start;
     Point finish;
@@ -133,10 +134,21 @@ struct Segment {
             std::swap(start, finish);
     }
     bool operator <(const Segment& a) const {
-        if (start.yequal(a.start)) {
-            return finish.ycomp(a.finish);
+        if (start.x == a.start.x) {
+            if (start.yequal(a.start)) {
+                return finish.ycomp(a.finish);
+            }
+            return start.ycomp(a.start);
         }
-        return start.ycomp(a.start);
+        const Segment* second = (start.x < a.start.x ? &a : this);
+        const Segment* first = (start.x < a.start.x ? this: &a);
+        ld y1 = (second->start.x - first->start.x) * (first->finish.y - first->start.y) /
+                (first->finish.x - first->start.x) + first->start.y;
+        bool is = y1 < second->start.y;
+        if (first->start.x == start.x)
+            return is;
+        return ! is;
+
     }
     bool operator ==(const Segment& a) const {
         return start == a.start && finish == a.finish;
