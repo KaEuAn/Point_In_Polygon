@@ -17,9 +17,9 @@ using ld = long double;
 const ld EPS = 1e-10;
 
 enum Type{
-    out,
     in,
-    query
+    query,
+    out
 };
 
 bool isZero(ld x) {
@@ -153,11 +153,11 @@ struct Event{
     Event(Point a, Type b, Segment* c, u32 n = 0) : point(a), action(b), segment(c), number(n) {}
     bool operator <(const Event& a) const {
         if (point == a.point) {
-            if (action == a.action)
-                return *segment < *a.segment;
             return action < a.action;
         }
-        return point.xcomp(a.point);
+        if (point.x == a.point.x)
+            return point.y < a.point.y;
+        return point.x < a.point.x;
     }
 };
 
@@ -339,10 +339,8 @@ class solveTask{
 
     void addSegment(Point first, Point second) {
         Polygon.push_back(Segment(first, second));
-        if(first.x != second.x) {
-            events.push_back(Event(Polygon.back().start, in, &Polygon.back()));
-            events.push_back(Event(Polygon.back().finish, out, &Polygon.back()));
-        }
+        events.push_back(Event(Polygon.back().start, in, &Polygon.back()));
+        events.push_back(Event(Polygon.back().finish, out, &Polygon.back()));
     }
     void printAnswer() const {
         for (int i = 0; i < k; ++i) {
@@ -354,13 +352,33 @@ class solveTask{
                 cout << "OUTSIDE" << '\n';
         }
     }
+    void makeAnswer() {
+        BinarySearchTree tree;
+        for(auto it: events) {
+            if (it.action == in) {
+                tree.insert(*(it.segment));
+            } else if (it.action == out) {
+                tree.erase(*(it.segment));
+            } else {
+                auto fight = tree.find(it.point);
+                if (fight.first && contains(it.point, fight.first->key))
+                    answers[it.number] = 1;
+                else if (fight.second % 2 == 0) {
+                    answers[it.number] = 2;
+                } else if (fight.second % 2 == 1) {
+                    answers[it.number] = 0;
+                }
+            }
+        }
+    }
 
+public:
     void makeOneTest() {
         cin >> n;
         Polygon.reserve(n);
         ld a, b;
         cin >> a >> b;
-        Point first(a ,b);
+        Point first(a, b);
         for (u32 i = 1; i < n; ++i) {
             cin >> a >> b;
             Point second(a, b);
@@ -381,38 +399,19 @@ class solveTask{
             events.push_back(queryEvent);
         }
         preparation();
-        BinarySearchTree tree;
-        for(auto it: events) {
-            if (it.action == in) {
-                tree.insert(*(it.segment));
-            } else if (it.action == out) {
-                tree.erase(*(it.segment));
-            } else {
-                auto fight = tree.find(it.point);
-                if (fight.first && contains(it.point, fight.first->key))
-                    answers[it.number] = 1;
-                if (fight.second % 2 == 0) {
-                    answers[it.number] = 0;
-                } else if (fight.second % 2 == 1) {
-                    answers[it.number] = 2;
-                }
-            }
-        }
+        makeAnswer();
         printAnswer();
     }
-public:
-    void run() {
-        u32 t;
-        cin >> t;
-        for (int testNumber = 0; testNumber < t; ++testNumber) {
-            makeOneTest();
-        }
-    }
+
 };
 
 
 int main() {
     solveTask task;
-    task.run();
+    u32 t;
+    cin >> t;
+    for (int testNumber = 0; testNumber < t; ++testNumber) {
+        task.makeOneTest();
+    }
     return 0;
 }
