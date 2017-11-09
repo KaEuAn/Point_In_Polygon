@@ -17,9 +17,9 @@ using ld = long double;
 const ld EPS = 1e-10;
 
 enum Type{
+    out,
     in,
-    query,
-    out
+    query
 };
 
 bool isZero(ld x) {
@@ -133,7 +133,7 @@ struct Segment {
             std::swap(start, finish);
     }
     bool operator <(const Segment& a) const {
-        if (start.x == a.start.x) {
+        if (areEqual(start.x, a.start.x)) {
             if (start.yequal(a.start)) {
                 return finish.ycomp(a.finish);
             }
@@ -144,13 +144,13 @@ struct Segment {
         ld y1 = (second->start.x - first->start.x) * (first->finish.y - first->start.y) /
                 (first->finish.x - first->start.x) + first->start.y;
         bool is = y1 < second->start.y;
-        if (first->start.x == start.x)
+        if (areEqual(first->start.x, start.x))
             return is;
         return ! is;
 
     }
     bool operator ==(const Segment& a) const {
-        return start == a.start && finish == a.finish;
+        return (start == a.start) && (finish == a.finish);
     }
 
 };
@@ -175,7 +175,7 @@ struct Event{
 bool isHigher(Point a, Segment b) {
     if (b.start.x == b.finish.x)
         return a.y > b.finish.y;
-    return isLessThan((a.x - b.start.x) / (b.finish.x - b.start.x) * (b.finish.y - b.start.y) + b.start.y, a.y);
+    return isLessThan( (ld)(a.x - b.start.x) / (b.finish.x - b.start.x) * (b.finish.y - b.start.y) + b.start.y, a.y);
 }
 bool contains(Point a, Segment b) {
     if (b.start.x == b.finish.x)
@@ -250,6 +250,8 @@ public:
         return this;
     }
     Node* erase(Segment newKey) {
+        if (!this)
+            return this;
         long long count_left = left->countBehindFunc() + 1;
         if (newKey == key) {
             Node* x = this;
@@ -348,6 +350,7 @@ class solveTask{
     vector<Segment> Polygon;
     std::vector<Event> events;
     vector<uint8_t> answers;
+    std::set<Point> Verticies;
 
     void preparation() {
         std::sort(events.begin(), events.end());
@@ -355,8 +358,10 @@ class solveTask{
 
     void addSegment(Point first, Point second) {
         Polygon.push_back(Segment(first, second));
-        events.push_back(Event(Polygon.back().start, in, &Polygon.back()));
-        events.push_back(Event(Polygon.back().finish, out, &Polygon.back()));
+        if (first.x != second.x) {
+            events.push_back(Event(Polygon.back().start, in, &Polygon.back()));
+            events.push_back(Event(Polygon.back().finish, out, &Polygon.back()));
+        }
     }
     void printAnswer() const {
         for (int i = 0; i < k; ++i) {
@@ -377,7 +382,8 @@ class solveTask{
                 tree.erase(*(it.segment));
             } else {
                 auto fight = tree.find(it.point);
-                if (fight.first && contains(it.point, fight.first->key))
+                if (fight.first && contains(it.point, fight.first->key) ||
+                        Verticies.find(it.point) != Verticies.end())
                     answers[it.number] = 1;
                 else if (fight.second % 2 == 0) {
                     answers[it.number] = 2;
@@ -395,9 +401,11 @@ public:
         ld a, b;
         cin >> a >> b;
         Point first(a, b);
+        Verticies.insert(first);
         for (u32 i = 1; i < n; ++i) {
             cin >> a >> b;
             Point second(a, b);
+            Verticies.insert(second);
             std::swap(first, second);
             if(first == second)
                 continue;
