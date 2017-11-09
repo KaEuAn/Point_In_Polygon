@@ -409,11 +409,12 @@ public:
 
 
 int main() {
-    solveTask task;
     u32 t;
     cin >> t;
     for (int testNumber = 0; testNumber < t; ++testNumber) {
+        solveTask task;
         task.makeOneTest();
+        cout << '\n';
     }
     return 0;
 }
