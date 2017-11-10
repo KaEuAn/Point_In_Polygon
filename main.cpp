@@ -1,4 +1,5 @@
 #include <iostream>
+#include <cstdio>
 #include <string>
 #include <vector>
 #include <algorithm>
@@ -14,6 +15,7 @@ using std::string;
 using u32 = uint32_t;
 using u64 = uint64_t;
 using ld = long double;
+using ll = long long;
 const ld EPS = 1e-10;
 
 enum Type{
@@ -35,11 +37,11 @@ bool isLessThan(ld x, ld y) {
 
 
 struct Point {
-    ld x;
-    ld y;
+    ll x;
+    ll y;
 public:
     Point() : x(0), y(0) {}
-    Point(ld first, ld second) : x(first), y(second){}
+    Point(ll first, ll second) : x(first), y(second){}
 
     ld length() const {
         return std::sqrt(x * x + y * y);
@@ -81,15 +83,6 @@ public:
         return y == a.y;
     }
 
-    bool xcomp(const Point& a) const {
-        if (x == a.x) {
-            return y < a.y;
-        }
-        return x < a.x;
-    }
-    bool xequal(const Point& a) const {
-        return x == a.x;
-    }
 
 
 
@@ -134,16 +127,18 @@ struct Segment {
     }
     bool operator <(const Segment& a) const {
         if (start.x == a.start.x) {
-            if (start.yequal(a.start)) {
-                return finish.ycomp(a.finish);
+            if (start.y == a.start.y) {
+                Point first = finish - start;
+                Point second = a.finish - a.start;
+                return first % second > 0;
             }
-            return start.ycomp(a.start);
+            return start.y < a.start.y;
         }
         const Segment* second = (start.x < a.start.x ? &a : this);
         const Segment* first = (start.x < a.start.x ? this: &a);
-        ld y1 = (second->start.x - first->start.x) * (first->finish.y - first->start.y) /
-                (first->finish.x - first->start.x) + first->start.y;
-        bool is = y1 < second->start.y;
+        ll y1 = (second->start.x - first->start.x) * (first->finish.y - first->start.y)
+                 + first->start.y * (first->finish.x - first->start.x);
+        bool is = y1 < second->start.y * (first->finish.x - first->start.x);
         if (first->start.x == start.x)
             return is;
         return ! is;
@@ -175,13 +170,14 @@ struct Event{
 bool isHigher(Point a, Segment b) {
     if (b.start.x == b.finish.x)
         return a.y > b.finish.y;
-    return isLessThan((a.x - b.start.x) / (b.finish.x - b.start.x) * (b.finish.y - b.start.y) + b.start.y, a.y);
+    return (a.x - b.start.x) * (b.finish.y - b.start.y) +
+                               b.start.y * (b.finish.x - b.start.x) < a.y * (b.finish.x - b.start.x);
 }
 bool contains(Point a, Segment b) {
     if (b.start.x == b.finish.x)
-        return (a.x == b.start.x) && (a.y < b.finish.y && b.start.y < a.y);
-    ld x = ((ld)(a.x - b.start.x) * (b.finish.y - b.start.y) ) / (b.finish.x - b.start.x);
-    return areEqual(x + b.start.y, a.y);
+        return (a.x == b.start.x) && (a.y <= b.finish.y && b.start.y <= a.y);
+    ll x = (a.x - b.start.x) * (b.finish.y - b.start.y);
+    return x + b.start.y * (b.finish.x - b.start.x) == a.y * (b.finish.x - b.start.x);
 }
 
 class Node {
@@ -392,9 +388,10 @@ public:
     void makeOneTest() {
         cin >> n;
         Polygon.reserve(n);
-        ld a, b;
+        ll a, b;
         cin >> a >> b;
         Point first(a, b);
+        Point firstfirst(a, b);
         for (u32 i = 1; i < n; ++i) {
             cin >> a >> b;
             Point second(a, b);
@@ -403,12 +400,12 @@ public:
                 continue;
             addSegment(second, first);
         }
-        addSegment(first, Polygon[0].start);
+        addSegment(first, firstfirst);
         cin >> k;
         answers.assign(k, 0);
         events.reserve(n + k);
         for (u32 i = 0; i < k; ++i) {
-            ld a, b;
+            ll a, b;
             cin >> a >> b;
             Point queryPoint(a, b);
             Event queryEvent(queryPoint, query, nullptr, i);
