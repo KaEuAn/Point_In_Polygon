@@ -132,29 +132,31 @@ struct Segment {
         if (start > finish)
             std::swap(start, finish);
     }
-    bool operator <(const Segment& a) const {
-        if (start.x == a.start.x) {
-            if (start.y == a.start.y) {
-                Point first = finish - start;
-                Point second = a.finish - a.start;
-                return first % second > 0;
-            }
-            return start.y < a.start.y;
-        }
-        const Segment* second = (start.x < a.start.x ? &a : this);
-        const Segment* first = (start.x < a.start.x ? this: &a);
-        ll y1 = (second->start.x - first->start.x) * (first->finish.y - first->start.y)
-                 + first->start.y * (first->finish.x - first->start.x);
-        bool is = y1 < second->start.y * (first->finish.x - first->start.x);
-        if (first->start.x == start.x)
-            return is;
-        return ! is;
 
-    }
     bool operator ==(const Segment& a) const {
         return start == a.start && finish == a.finish;
     }
 
+};
+struct SegmentComparator {
+    bool operator() (const Segment& a, const Segment& b) {
+        if (a.start.x == b.start.x) {
+            if (a.start.y == b.start.y) {
+                Point first = a.finish - a.start;
+                Point second = b.finish - b.start;
+                return first % second > 0;
+            }
+            return a.start.y < b.start.y;
+        }
+        const Segment &second = (a.start.x < b.start.x ? b : a);
+        const Segment &first = (a.start.x < b.start.x ? a : b);
+        ll y1 = (second.start.x - first.start.x) * (first.finish.y - first.start.y)
+                + first.start.y * (first.finish.x - first.start.x);
+        bool is = y1 < second.start.y * (first.finish.x - first.start.x);
+        if (first.start.x == a.start.x)
+            return is;
+        return !is;
+    }
 };
 
 struct Event{
@@ -187,12 +189,15 @@ bool contains(Point a, Segment b) {
     return x + b.start.y * (b.finish.x - b.start.x) == a.y * (b.finish.x - b.start.x);
 }
 
+template <typename _T, typename Comp = std::less<_T>>
 class Node {
 protected:
+    using myNode = Node<_T, Comp>;
     //left < right
-    Node* left;
-    Node* right;
-    Segment key;
+    Comp comp;
+    myNode* left;
+    myNode* right;
+    _T key;
     long long priority;
     u32 countBehind;
 
@@ -211,9 +216,9 @@ protected:
 
 public:
 
-    std::pair<Node*, u32> find(Point findKey) {
+    std::pair<myNode*, u32> find(Point findKey) {
         if (!this)
-            return std::make_pair<Node*, u32>(nullptr, 0);
+            return std::make_pair<myNode*, u32>(nullptr, 0);
         if (contains(findKey, key)) {
             return std::make_pair(this, 0);
         }
@@ -240,7 +245,7 @@ public:
             delete right;
     }
 
-    Node* insert(Node* a) {
+    myNode* insert(myNode* a) {
         if (!this)
             return a;
         if (a->priority > this->priority) {
@@ -248,22 +253,22 @@ public:
             a->updateAll();
             return a;
         }
-        (a->key < key ? left: right) = (a->key < key ? left: right)->insert(a);
+        (comp(a->key, key) ? left: right) = (comp(a->key, key) ? left: right)->insert(a);
         updateAll();
         return this;
     }
-    Node* erase(Segment newKey) {
+    myNode* erase(Segment newKey) {
         long long count_left = left->countBehindFunc() + 1;
         if (newKey == key) {
-            Node* x = this;
-            Node* answer = merge(left, right);
+            myNode* x = this;
+            myNode* answer = merge(left, right);
             x->left = nullptr;
             x->right = nullptr;
             delete x;
             x = nullptr;
             return answer;
         }
-        if (newKey < key) {
+        if (comp(newKey, key)) {
             left = left->erase(newKey);
         } else
             right = right->erase(newKey);
@@ -271,15 +276,15 @@ public:
         return this;
     }
 
-    friend void split(Node*, Segment, Node*&, Node*&);
-    friend Node* merge(Node* l, Node* r);
+    template <typename T, typename C> friend void split(Node<T, C>*, T, Node<T, C>*&, Node<T, C>*&);
+    template <typename T, typename C> friend Node<T, C>* merge(Node<T, C>* l, Node<T, C>* r);
     friend class solveTask;
 };
 
 
-
-Node* merge(Node* l, Node* r) {
-    Node* my;
+template <typename T, typename C>
+Node<T, C>* merge(Node<T, C>* l, Node<T, C>* r) {
+    Node<T, C>* my;
     if (!l || !r) {
         my = (l ? l : r);
         return my;
@@ -294,33 +299,36 @@ Node* merge(Node* l, Node* r) {
     my->updateAll();
     return my;
 }
-void split(Node* myVertex, Segment inputKey, Node*& l, Node*& r) {
+template <typename T, typename C>
+void split(Node<T, C>* myVertex, T inputKey, Node<T, C>*& l, Node<T, C>*& r) {
+    C comp;
     if (!myVertex) {
         l = nullptr;
         r = nullptr;
         return;
     }
-    if (!(inputKey < myVertex->key)) {
-        split(myVertex->right, inputKey, myVertex->right, r);
+    if (!comp(inputKey, myVertex->key)) {
+        split<T, C>(myVertex->right, inputKey, myVertex->right, r);
         l = myVertex;
         l->updateAll();
     } else {
-        split(myVertex->left, inputKey, l, myVertex->left);
+        split<T, C>(myVertex->left, inputKey, l, myVertex->left);
         r = myVertex;
         r->updateAll();
     }
     myVertex->updateAll();
 }
 
-
+template <typename _T, typename Comp = std::less<_T>>
 class BinarySearchTree{
-    Node* root;
+    using myNode = Node<_T, Comp>;
+    myNode* root;
 public:
     explicit BinarySearchTree() : root(nullptr) {}
     BinarySearchTree(long long size, Segment* array) {
-        root = new Node(array[0]);
+        root = new myNode(array[0]);
         for (long long i = 1; i < size; ++i) {
-            Node* ver = new Node(array[i]);
+            Node<_T, Comp>* ver = new myNode(array[i]);
             root = root->insert(ver);
         }
     }
@@ -330,7 +338,7 @@ public:
     }
 
     void insert(Segment key) {
-        Node* newNode = new Node(key);
+        myNode* newNode = new myNode(key);
         if (! root) {
             root = newNode;
             return;
@@ -340,7 +348,7 @@ public:
     void erase(Segment key) {
         root = root->erase(key);
     }
-    std::pair<Node*, u32> find(Point key) const {
+    std::pair<myNode*, u32> find(Point key) const {
         return root->find(key);
     }
 };
@@ -372,7 +380,7 @@ class solveTask{
         }
     }
     void makeAnswer() {
-        BinarySearchTree tree;
+        BinarySearchTree<Segment, SegmentComparator> tree;
         for(auto it: events) {
             if (it.action == in) {
                 tree.insert(*(it.segment));
