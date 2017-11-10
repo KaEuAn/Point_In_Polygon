@@ -24,6 +24,12 @@ enum Type{
     out
 };
 
+enum Answer{
+    inside,
+    border,
+    outside
+};
+
 bool isZero(ld x) {
     return -EPS <= x && x <= EPS;
 }
@@ -42,6 +48,7 @@ struct Point {
 public:
     Point() : x(0), y(0) {}
     Point(ll first, ll second) : x(first), y(second){}
+    Point(const Point& a) : x(a.x), y(a.y) {}
 
     ld length() const {
         return std::sqrt(x * x + y * y);
@@ -197,7 +204,7 @@ protected:
         countBehind = left->countBehindFunc() + right->countBehindFunc() + 1;
     }
 
-    void update_all() {
+    void updateAll() {
         updateCount();
     }
 
@@ -238,11 +245,11 @@ public:
             return a;
         if (a->priority > this->priority) {
             split(this, a->key, a->left, a->right);
-            a->update_all();
+            a->updateAll();
             return a;
         }
         (a->key < key ? left: right) = (a->key < key ? left: right)->insert(a);
-        update_all();
+        updateAll();
         return this;
     }
     Node* erase(Segment newKey) {
@@ -260,7 +267,7 @@ public:
             left = left->erase(newKey);
         } else
             right = right->erase(newKey);
-        update_all();
+        updateAll();
         return this;
     }
 
@@ -284,7 +291,7 @@ Node* merge(Node* l, Node* r) {
         l->right = merge(l->right, r);
         my = l;
     }
-    my->update_all();
+    my->updateAll();
     return my;
 }
 void split(Node* myVertex, Segment inputKey, Node*& l, Node*& r) {
@@ -296,13 +303,13 @@ void split(Node* myVertex, Segment inputKey, Node*& l, Node*& r) {
     if (!(inputKey < myVertex->key)) {
         split(myVertex->right, inputKey, myVertex->right, r);
         l = myVertex;
-        l->update_all();
+        l->updateAll();
     } else {
         split(myVertex->left, inputKey, l, myVertex->left);
         r = myVertex;
-        r->update_all();
+        r->updateAll();
     }
-    myVertex->update_all();
+    myVertex->updateAll();
 }
 
 
@@ -343,7 +350,7 @@ class solveTask{
     u32 n, k;
     vector<Segment> Polygon;
     std::vector<Event> events;
-    vector<uint8_t> answers;
+    vector<Answer> answers;
 
     void preparation() {
         std::sort(events.begin(), events.end());
@@ -356,9 +363,9 @@ class solveTask{
     }
     void printAnswer() const {
         for (int i = 0; i < k; ++i) {
-            if (answers[i] == 0)
+            if (answers[i] == inside)
                 cout << "INSIDE" << '\n';
-            else if (answers[i] == 1)
+            else if (answers[i] == border)
                 cout << "BORDER" << '\n';
             else
                 cout << "OUTSIDE" << '\n';
@@ -374,40 +381,37 @@ class solveTask{
             } else {
                 auto fight = tree.find(it.point);
                 if (fight.first && contains(it.point, fight.first->key))
-                    answers[it.number] = 1;
+                    answers[it.number] = border;
                 else if (fight.second % 2 == 0) {
-                    answers[it.number] = 2;
+                    answers[it.number] = outside;
                 } else if (fight.second % 2 == 1) {
-                    answers[it.number] = 0;
+                    answers[it.number] = inside;
                 }
             }
         }
     }
 
 public:
-    void makeOneTest() {
-        cin >> n;
+    void run(const vector<Point>& verticies, const vector<Point>& queries) {
+        n = verticies.size();
         Polygon.reserve(n);
         ll a, b;
-        cin >> a >> b;
-        Point first(a, b);
-        Point firstfirst(a, b);
+        Point first(verticies[0]);
+        Point firstfirst(first);
         for (u32 i = 1; i < n; ++i) {
-            cin >> a >> b;
-            Point second(a, b);
+            Point second(verticies[i]);
             std::swap(first, second);
             if(first == second)
                 continue;
             addSegment(second, first);
         }
         addSegment(first, firstfirst);
-        cin >> k;
-        answers.assign(k, 0);
+        k = queries.size();
+        answers.assign(k, outside);
         events.reserve(n + k);
         for (u32 i = 0; i < k; ++i) {
             ll a, b;
-            cin >> a >> b;
-            Point queryPoint(a, b);
+            Point queryPoint(queries[i]);
             Event queryEvent(queryPoint, query, nullptr, i);
             events.push_back(queryEvent);
         }
@@ -416,15 +420,32 @@ public:
         printAnswer();
     }
 
-};
 
+};
 
 int main() {
     u32 t;
     cin >> t;
     for (int testNumber = 0; testNumber < t; ++testNumber) {
+        u32 n;
+        cin >> n;
+        vector<Point> verticies;
+        verticies.reserve(n);
+        for (int i = 0; i < n; ++i) {
+            ll a, b;
+            cin >> a >> b;
+            verticies.push_back(Point(a, b));
+        }
+        cin >> n;
+        vector<Point> queries;
+        queries.reserve(n);
+        for (int i = 0; i < n; ++i) {
+            ll a, b;
+            cin >> a >> b;
+            queries.push_back(Point(a, b));
+        }
         solveTask task;
-        task.makeOneTest();
+        task.run(verticies, queries);
         cout << '\n';
     }
     return 0;
