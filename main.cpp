@@ -1,6 +1,5 @@
 #include <iostream>
 #include <cstdio>
-#include <string>
 #include <vector>
 #include <algorithm>
 #include <unordered_map>
@@ -16,9 +15,8 @@ using u32 = uint32_t;
 using u64 = uint64_t;
 using ld = long double;
 using ll = long long;
-const ld EPS = 1e-10;
 
-enum Type{
+enum ActionType{
     in,
     query,
     out
@@ -30,40 +28,20 @@ enum Answer{
     outside
 };
 
-bool isZero(ld x) {
-    return -EPS <= x && x <= EPS;
-}
-bool areEqual(ld x, ld y) {
-    return isZero(x - y);
-}
-bool isLessThan(ld x, ld y) {
-    return x < y - EPS;
-}
-
-
 
 struct Point {
-    ll x;
-    ll y;
+    int x;
+    int y;
 public:
     Point() : x(0), y(0) {}
-    Point(ll first, ll second) : x(first), y(second){}
+    Point(int first, int second) : x(first), y(second){}
     Point(const Point& a) : x(a.x), y(a.y) {}
 
-    ld length() const {
-        return std::sqrt(x * x + y * y);
-    }
     ld operator%(const Point& second) const {
         return x * second.y - y * second.x;
     }
     ld operator*(const Point& second) const {
         return x * second.x + y * second.y;
-    }
-    ld len2() const {
-        return x*x + y*y;
-    }
-    ld len() const {
-        return std::sqrt(len2());
     }
 
 
@@ -79,19 +57,6 @@ public:
     bool operator >(const Point& a) const {
         return a < *this;
     }
-
-    bool ycomp(const Point& a) const {
-        if (y == a.y) {
-            return x < a.x;
-        }
-        return y < a.y;
-    }
-    bool yequal(const Point& a) const {
-        return y == a.y;
-    }
-
-
-
 
     bool operator != (const Point& a) {
         return ! (*this == a);
@@ -153,19 +118,17 @@ struct SegmentComparator {
         ll y1 = (second.start.x - first.start.x) * (first.finish.y - first.start.y)
                 + first.start.y * (first.finish.x - first.start.x);
         bool is = y1 < second.start.y * (first.finish.x - first.start.x);
-        if (first.start.x == a.start.x)
-            return is;
-        return !is;
+        return (a.start.x == first.start.x) == is;
     }
 };
 
 struct Event{
     Point point;
-    Type action;
+    ActionType action;
     Segment* segment;
     u32 number;
 
-    Event(Point a, Type b, Segment* c, u32 n = 0) : point(a), action(b), segment(c), number(n) {}
+    Event(Point a, ActionType b, Segment* c, u32 n = 0) : point(a), action(b), segment(c), number(n) {}
     bool operator <(const Event& a) const {
         if (point == a.point) {
             return action < a.action;
@@ -189,15 +152,15 @@ bool contains(Point a, Segment b) {
     return x + b.start.y * (b.finish.x - b.start.x) == a.y * (b.finish.x - b.start.x);
 }
 
-template <typename _T, typename Comp = std::less<_T>>
+template <typename StoredType, typename Comp = std::less<StoredType>>
 class Node {
 protected:
-    using myNode = Node<_T, Comp>;
+    using myNode = Node<StoredType, Comp>;
     //left < right
     Comp comp;
     myNode* left;
     myNode* right;
-    _T key;
+    StoredType key;
     long long priority;
     u32 countBehind;
 
@@ -258,14 +221,12 @@ public:
         return this;
     }
     myNode* erase(Segment newKey) {
-        long long count_left = left->countBehindFunc() + 1;
         if (newKey == key) {
             myNode* x = this;
             myNode* answer = merge(left, right);
             x->left = nullptr;
             x->right = nullptr;
             delete x;
-            x = nullptr;
             return answer;
         }
         if (comp(newKey, key)) {
@@ -276,59 +237,59 @@ public:
         return this;
     }
 
-    template <typename T, typename C> friend void split(Node<T, C>*, T, Node<T, C>*&, Node<T, C>*&);
-    template <typename T, typename C> friend Node<T, C>* merge(Node<T, C>* l, Node<T, C>* r);
-    friend class solveTask;
+    template <typename CurrentType, typename Compar> friend void split(Node<CurrentType, Compar>*, CurrentType, Node<CurrentType, Compar>*&, Node<CurrentType, Compar>*&);
+    template <typename CurrentType, typename Compar> friend Node<CurrentType, Compar>* merge(Node<CurrentType, Compar>* left, Node<CurrentType, Compar>* right);
+    friend class SolveTaskPointsInPolygon;
 };
 
 
-template <typename T, typename C>
-Node<T, C>* merge(Node<T, C>* l, Node<T, C>* r) {
-    Node<T, C>* my;
-    if (!l || !r) {
-        my = (l ? l : r);
-        return my;
+template <typename CurrentType, typename Compar>
+Node<CurrentType, Compar>* merge(Node<CurrentType, Compar>* left, Node<CurrentType, Compar>* right) {
+    Node<CurrentType, Compar>* newRoot;
+    if (!left || !right) {
+        newRoot = (left ? left : right);
+        return newRoot;
     }
-    if (l->priority < r->priority) {
-        r->left = merge(l, r->left);
-        my = r;
+    if (left->priority < right->priority) {
+        right->left = merge(left, right->left);
+        newRoot = right;
     } else{
-        l->right = merge(l->right, r);
-        my = l;
+        left->right = merge(left->right, right);
+        newRoot = left;
     }
-    my->updateAll();
-    return my;
+    newRoot->updateAll();
+    return newRoot;
 }
-template <typename T, typename C>
-void split(Node<T, C>* myVertex, T inputKey, Node<T, C>*& l, Node<T, C>*& r) {
-    C comp;
-    if (!myVertex) {
-        l = nullptr;
-        r = nullptr;
+template <typename CurrentType, typename Compar>
+void split(Node<CurrentType, Compar>* thisVertex, CurrentType inputKey, Node<CurrentType, Compar>*& left, Node<CurrentType, Compar>*& right) {
+    Compar comp;
+    if (!thisVertex) {
+        left = nullptr;
+        right = nullptr;
         return;
     }
-    if (!comp(inputKey, myVertex->key)) {
-        split<T, C>(myVertex->right, inputKey, myVertex->right, r);
-        l = myVertex;
-        l->updateAll();
+    if (!comp(inputKey, thisVertex->key)) {
+        split<CurrentType, Compar>(thisVertex->right, inputKey, thisVertex->right, right);
+        left = thisVertex;
+        left->updateAll();
     } else {
-        split<T, C>(myVertex->left, inputKey, l, myVertex->left);
-        r = myVertex;
-        r->updateAll();
+        split<CurrentType, Compar>(thisVertex->left, inputKey, left, thisVertex->left);
+        right = thisVertex;
+        right->updateAll();
     }
-    myVertex->updateAll();
+    thisVertex->updateAll();
 }
 
-template <typename _T, typename Comp = std::less<_T>>
+template <typename StoredType, typename Comp = std::less<StoredType>>
 class BinarySearchTree{
-    using myNode = Node<_T, Comp>;
+    using myNode = Node<StoredType, Comp>;
     myNode* root;
 public:
     explicit BinarySearchTree() : root(nullptr) {}
     BinarySearchTree(long long size, Segment* array) {
         root = new myNode(array[0]);
         for (long long i = 1; i < size; ++i) {
-            Node<_T, Comp>* ver = new myNode(array[i]);
+            Node<StoredType, Comp>* ver = new myNode(array[i]);
             root = root->insert(ver);
         }
     }
@@ -354,13 +315,12 @@ public:
 };
 
 
-class solveTask{
-    u32 n, k;
+class SolveTaskPointsInPolygon{
     vector<Segment> Polygon;
     std::vector<Event> events;
     vector<Answer> answers;
 
-    void preparation() {
+    void sortEvents() {
         std::sort(events.begin(), events.end());
     }
 
@@ -369,30 +329,20 @@ class solveTask{
         events.push_back(Event(Polygon.back().start, in, &Polygon.back()));
         events.push_back(Event(Polygon.back().finish, out, &Polygon.back()));
     }
-    void printAnswer() const {
-        for (int i = 0; i < k; ++i) {
-            if (answers[i] == inside)
-                cout << "INSIDE" << '\n';
-            else if (answers[i] == border)
-                cout << "BORDER" << '\n';
-            else
-                cout << "OUTSIDE" << '\n';
-        }
-    }
     void makeAnswer() {
         BinarySearchTree<Segment, SegmentComparator> tree;
-        for(auto it: events) {
+        for(const auto& it: events) {
             if (it.action == in) {
                 tree.insert(*(it.segment));
             } else if (it.action == out) {
                 tree.erase(*(it.segment));
             } else {
-                auto fight = tree.find(it.point);
-                if (fight.first && contains(it.point, fight.first->key))
+                const auto& current = tree.find(it.point);
+                if (current.first && contains(it.point, current.first->key))
                     answers[it.number] = border;
-                else if (fight.second % 2 == 0) {
+                else if (current.second % 2 == 0) {
                     answers[it.number] = outside;
-                } else if (fight.second % 2 == 1) {
+                } else if (current.second % 2 == 1) {
                     answers[it.number] = inside;
                 }
             }
@@ -400,10 +350,9 @@ class solveTask{
     }
 
 public:
-    void run(const vector<Point>& verticies, const vector<Point>& queries) {
-        n = verticies.size();
+    vector<Answer> identifyWhereArePoints(const vector<Point> &verticies, const vector<Point> &queries) {
+        u32 n = verticies.size();
         Polygon.reserve(n);
-        ll a, b;
         Point first(verticies[0]);
         Point firstfirst(first);
         for (u32 i = 1; i < n; ++i) {
@@ -414,46 +363,61 @@ public:
             addSegment(second, first);
         }
         addSegment(first, firstfirst);
-        k = queries.size();
+        u32 k = queries.size();
         answers.assign(k, outside);
         events.reserve(n + k);
         for (u32 i = 0; i < k; ++i) {
-            ll a, b;
             Point queryPoint(queries[i]);
             Event queryEvent(queryPoint, query, nullptr, i);
             events.push_back(queryEvent);
         }
-        preparation();
+        sortEvents();
         makeAnswer();
-        printAnswer();
+        return answers;
     }
 
 
 };
 
+void input(vector<Point>& verticies, vector<Point>& queries) {
+    u32 n;
+    cin >> n;
+    verticies.reserve(n);
+    for (u32 i = 0; i < n; ++i) {
+        ll a, b;
+        cin >> a >> b;
+        verticies.push_back(Point(a, b));
+    }
+    cin >> n;
+    queries.reserve(n);
+    for (u32 i = 0; i < n; ++i) {
+        ll a, b;
+        cin >> a >> b;
+        queries.push_back(Point(a, b));
+    }
+}
+
+
+void printAnswer(const vector<Answer>& answers) {
+    for (u32 i = 0; i < answers.size(); ++i) {
+        if (answers[i] == inside)
+            cout << "INSIDE" << '\n';
+        else if (answers[i] == border)
+            cout << "BORDER" << '\n';
+        else
+            cout << "OUTSIDE" << '\n';
+    }
+}
+
 int main() {
     u32 t;
     cin >> t;
-    for (int testNumber = 0; testNumber < t; ++testNumber) {
-        u32 n;
-        cin >> n;
+    for (u32 testNumber = 0; testNumber < t; ++testNumber) {
         vector<Point> verticies;
-        verticies.reserve(n);
-        for (int i = 0; i < n; ++i) {
-            ll a, b;
-            cin >> a >> b;
-            verticies.push_back(Point(a, b));
-        }
-        cin >> n;
         vector<Point> queries;
-        queries.reserve(n);
-        for (int i = 0; i < n; ++i) {
-            ll a, b;
-            cin >> a >> b;
-            queries.push_back(Point(a, b));
-        }
-        solveTask task;
-        task.run(verticies, queries);
+        input(verticies, queries);
+        SolveTaskPointsInPolygon task;
+        printAnswer(task.identifyWhereArePoints(verticies, queries));
         cout << '\n';
     }
     return 0;
